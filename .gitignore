@@ -1,4 +1,6 @@
 imgs/*
 out_imgs/*
 out_imgs_512/*
+train_lmdb_color/*
+train_lmdb_line/*
 
