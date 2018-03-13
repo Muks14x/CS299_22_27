@@ -23,7 +23,7 @@ def imwrite(name, img):
     cv2.imwrite(name, img*255)
 
 def get_grayscale(image):
-    cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    return cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
 if __name__ == "__main__":
     data = get_image_dirs()
