@@ -185,7 +185,7 @@ class Shader():
                 if i % 100 == 0:
                     recreation = self.sess.run(self.gen_shaded_images, feed_dict={self.line_images: batch_edge, self.real_images: batch_grayscale})
                     for j in xrange(self.batch_size):
-                        imwrite("results/"+str(e*100000 + i) + "_" + str(j) +".jpg", recreation)
+                        imwrite("results/"+str(e*100000 + i) + "_" + str(j) +".jpg", recreation[j])
 
 
                 if i % 500 == 0:
