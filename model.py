@@ -2,7 +2,7 @@ from utils import *
 from line_drawing_utils import *
 
 class Shader():
-    def __init__(self, input_size=[256, 256, 1], output_size=[256, 256, 1], batch_size=4):
+    def __init__(self, input_size=[256, 256, 1][:], output_size=[256, 256, 1][:], batch_size=4):
         self.batch_size = batch_size
         self.output_size = output_size
 
@@ -16,13 +16,13 @@ class Shader():
 
         self.gen_shaded_images = self.generator(self.line_images)
 
-        self.real_images = tf.concat([self.line_images, self.real_images], 3)
-        self.fake_images = tf.concat([self.line_images, self.gen_shaded_images], 3)
+        self.real_images_full = tf.concat([self.line_images, self.real_images], 3)
+        self.fake_images_full = tf.concat([self.line_images, self.gen_shaded_images], 3)
 
         # We reuse the discriminator when its run the second time because we need the
         # same Variables (and thus the same network) used both times
-        self.disc_real_logits = self.discriminator(self.real_images, reuse=False)
-        self.disc_fake_logits = self.discriminator(self.fake_images, reuse=True)
+        self.disc_real_logits = self.discriminator(self.real_images_full, reuse=False)
+        self.disc_fake_logits = self.discriminator(self.fake_images_full, reuse=True)
 
         # self.d_loss_real = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits=self.disc_real_logits, labels=tf.stop_gradient(tf.constant([1]*batch_size))))
         # self.d_loss_fake = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits=self.disc_fake_logits, labels=tf.constant([0]*batch_size)))
@@ -170,6 +170,7 @@ class Shader():
                 batch = np.array([get_image(batch_file) for batch_file in batch_files])
 
                 batch_grayscale = np.array([get_grayscale(ba) for ba in batch]) / 255.0
+                batch_grayscale = np.expand_dims(batch_grayscale, 3)
 
                 batch_edge = np.array([get_line_drawing(img) for img in batch]) / 255.0
                 batch_edge = np.expand_dims(batch_edge, 3)
@@ -183,7 +184,7 @@ class Shader():
 
                 if i % 100 == 0:
                     recreation = self.sess.run(self.gen_shaded_images, feed_dict={self.line_images: batch_edge, self.real_images: batch_grayscale})
-                    for j in xrange(batch_size):
+                    for j in xrange(self.batch_size):
                         imwrite("results/"+str(e*100000 + i) + "_" + str(j) +".jpg", recreation)
 
 
