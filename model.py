@@ -6,7 +6,7 @@ class Shader():
         self.batch_size = batch_size
         self.output_size = output_size
 
-        self.l1_loss_wt = 1
+        self.l1_loss_wt = 100
 
         self.gen_dim_mult = 64
         self.disc_dim_mult = 64
@@ -37,7 +37,8 @@ class Shader():
         self.d_loss = self.d_loss_real + self.d_loss_fake
 
         self.g_adv_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=self.disc_fake_logits, labels=tf.ones_like(self.disc_fake_logits)))
-        self.g_l1_loss = tf.reduce_mean(tf.abs(self.real_images - self.gen_shaded_images))
+        # self.g_l1_loss = tf.reduce_mean(tf.abs(self.real_images - self.gen_shaded_images))
+        self.g_l1_loss = tf.reduce_mean(tf.nn.l2_loss(self.real_images - self.gen_shaded_images))
         self.g_loss = self.g_adv_loss + self.l1_loss_wt * self.g_l1_loss
 
 
