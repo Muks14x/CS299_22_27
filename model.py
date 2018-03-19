@@ -6,7 +6,7 @@ class Shader():
         self.batch_size = batch_size
         self.output_size = output_size
 
-        self.l1_loss_wt = 100
+        self.l1_loss_wt = 1
 
         self.gen_dim_mult = 64
         self.disc_dim_mult = 64
@@ -46,6 +46,8 @@ class Shader():
         self.d_vars = [var for var in tf_vars if 'd_' in var.name]
         self.g_vars = [var for var in tf_vars if 'g_' in var.name]
 
+        # The variables are separately addressed by the optimizers. When sess.run() is run on a loss
+        # function, only the corresponding variables get backpropogated into
         with tf.variable_scope(tf.get_variable_scope(), reuse=tf.AUTO_REUSE):
             self.d_optim = tf.train.AdamOptimizer(learning_rate=0.0002, beta1=0.5).minimize(self.d_loss, var_list=self.d_vars)
             self.g_optim = tf.train.AdamOptimizer(learning_rate=0.0002, beta1=0.5).minimize(self.g_loss, var_list=self.g_vars)
@@ -164,8 +166,14 @@ class Shader():
 
         datalen = len(data)
 
+        d_loss_tot = 0.0
+
         for e in xrange(20000):
-            for i in range(datalen / self.batch_size):
+            avg_d_loss = d_loss_tot / (datalen / self.batch_size)
+            d_loss_tot = 0.0
+            if avg_d_loss > 0.1:
+                print("Training discriminator")
+            for i in xrange(datalen / self.batch_size):
                 batch_files = data[i * self.batch_size : (i+1) * self.batch_size]
                 batch = np.array([get_image(batch_file) for batch_file in batch_files])
 
@@ -177,10 +185,16 @@ class Shader():
 
                 batch_normalized = batch/255.0
 
-                d_loss, _ = self.sess.run([self.d_loss, self.d_optim], feed_dict={self.line_images: batch_edge, self.real_images: batch_grayscale})
+                if avg_d_loss > 0.1:
+                    d_loss, _ = self.sess.run([self.d_loss, self.d_optim], feed_dict={self.line_images: batch_edge,
+                                                                                      self.real_images: batch_grayscale})
+                else:
+                    d_loss = self.sess.run(self.d_loss, feed_dict={self.line_images: batch_edge,
+                                                                                      self.real_images: batch_grayscale})
+                d_loss_tot += d_loss
                 g_loss, _ = self.sess.run([self.g_loss, self.g_optim], feed_dict={self.line_images: batch_edge, self.real_images: batch_grayscale})
 
-                print("%d: [%d / %d] d_loss %f, g_loss %f" % (e, i, (datalen/self.batch_size), d_loss, g_loss))
+                print("%d: [%d / %d] d_loss %f, g_loss %f, avg_d_loss %f" % (e, i, (datalen/self.batch_size), d_loss, g_loss, avg_d_loss))
 
                 if i % 100 == 0:
                     recreation = self.sess.run(self.gen_shaded_images, feed_dict={self.line_images: batch_edge, self.real_images: batch_grayscale})
