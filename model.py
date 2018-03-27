@@ -32,8 +32,8 @@ class Shader():
         # self.g_l1_loss = tf.reduce_mean(tf.abs(self.real_images - self.gen_shaded_images))
         # self.g_loss = self.g_adv_loss + self.l1_loss_wt * self.g_l1_loss
 
-        self.d_loss_real = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=self.disc_real_logits, labels=tf.ones_like(self.disc_real_logits)))
-        self.d_loss_fake = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=self.disc_fake_logits, labels=tf.zeros_like(self.disc_fake_logits)))
+        self.d_loss_real = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=self.disc_real_logits, labels=tf.constant([[0, 1]] * self.batch_size)))
+        self.d_loss_fake = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=self.disc_fake_logits, labels=tf.constant([[1, 0]] * self.batch_size)))
         self.d_loss = self.d_loss_real + self.d_loss_fake
 
         self.g_adv_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=self.disc_fake_logits, labels=tf.ones_like(self.disc_fake_logits)))
@@ -64,7 +64,7 @@ class Shader():
         h1 = lrelu(bn(conv2d(h0, self.disc_dim_mult*2, name='d_h1_conv'))) # h1 is (64 x 64 x self.disc_dim_mult*2)
         h2 = lrelu(bn(conv2d(h1, self.disc_dim_mult*4, name='d_h2_conv'))) # h2 is (32 x 32 x self.disc_dim_mult*4)
         h3 = lrelu(bn(conv2d(h2, self.disc_dim_mult*8, stride_h=1, stride_w=1, name='d_h3_conv'))) # h3 is (16 x 16 x self.disc_dim_mult*8)
-        h4 = dense(tf.reshape(h3, [self.batch_size, -1]), 1, activation=None)
+        h4 = dense(tf.reshape(h3, [self.batch_size, -1]), 2, activation=None)
         return h4
 
     def generator(self, img_in):
