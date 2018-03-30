@@ -161,9 +161,9 @@ class Shader():
 
         for i in xrange(self.batch_size):
             ## all are normalized
-            imwrite("results/base_" + str(i) + ".png", base_normalized[i])
-            imwrite("results/base_line_" + str(i) + ".jpg", base_edge[i])
-            imwrite("results/base_grayscale_" + str(i) + ".png", base_grayscale[i])
+            imwriteScaled("results/base_" + str(i) + ".png", base_normalized[i])
+            imwriteScaled("results/base_line_" + str(i) + ".jpg", base_edge[i])
+            imwriteScaled("results/base_grayscale_" + str(i) + ".png", base_grayscale[i])
 
         datalen = len(data)
 
@@ -200,7 +200,7 @@ class Shader():
                 if i % 100 == 0:
                     recreation = self.sess.run(self.gen_shaded_images, feed_dict={self.line_images: batch_edge, self.real_images: batch_grayscale})
                     for j in xrange(self.batch_size):
-                        imwrite("results/"+str(e*100000 + i) + "_" + str(j) +".jpg", recreation[j])
+                        imwriteScaled("results/" + str(e * 100000 + i) + "_" + str(j) + ".jpg", recreation[j])
 
 
                 if i % 500 == 0:

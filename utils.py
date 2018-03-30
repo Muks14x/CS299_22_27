@@ -30,7 +30,7 @@ def conv2d(input_, output_dim,
                             initializer=tf.contrib.layers.xavier_initializer(uniform=False, seed=None, dtype=tf.float32))
         conv = tf.nn.conv2d(input_, w, strides=[1, stride_h, stride_w, 1], padding='SAME')
         biases = tf.get_variable('biases', [output_dim], initializer=tf.constant_initializer(0.0))
-        conv = tf.reshape(tf.nn.bias_add(conv, biases), conv.get_shape())
+        conv = tf.nn.bias_add(conv, biases)
 
         return conv
 
@@ -43,14 +43,14 @@ def deconv2d(input_, output_shape,
         	initializer=tf.contrib.layers.xavier_initializer(uniform=False, seed=None, dtype=tf.float32))
         deconv = tf.nn.conv2d_transpose(input_, w, output_shape=output_shape, strides=[1, stride_h, stride_w, 1])
         biases = tf.get_variable('biases', [output_shape[-1]], initializer=tf.constant_initializer(0.0))
-        deconv = tf.reshape(tf.nn.bias_add(deconv, biases), deconv.get_shape())
+        deconv = tf.nn.bias_add(deconv, biases)
         if with_w:
             return deconv, w, biases
         else:
             return deconv
 
 def lrelu(input_, alpha=0.2, name="lrelu"):
-	return tf.nn.leaky_relu(input_, alpha=alpha, name=name)
+    return tf.nn.leaky_relu(input_, alpha=alpha, name=name)
 
 # def lrelu(x, leak=0.2, name="lrelu"):
 #   return tf.maximum(x, leak*x)
