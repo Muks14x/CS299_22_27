@@ -65,6 +65,7 @@ class Shader():
         h2 = lrelu(bn(conv2d(h1, self.disc_dim_mult*4, name='d_h2_conv'))) # h2 is (32 x 32 x self.disc_dim_mult*4)
         h3 = lrelu(bn(conv2d(h2, self.disc_dim_mult*8, stride_h=1, stride_w=1, name='d_h3_conv'))) # h3 is (16 x 16 x self.disc_dim_mult*8)
         h4 = dense(tf.reshape(h3, [self.batch_size, -1]), 2, activation=None)
+
         return h4
 
     def generator(self, img_in):
@@ -152,7 +153,12 @@ class Shader():
         data = get_image_dirs()
         print(data[0])
         base = np.array([get_image(sample_file) for sample_file in data[0: self.batch_size]])
-        base_grayscale = np.array([get_grayscale(ba) for ba in base]) / 255.0
+
+        base_hcl = [bgr2Hist(ba) for ba in base]
+        base_h, base_c, base_l = [np.squeeze(i) for i in np.split(np.asarray(base_hcl), 3, axis=1)]
+
+        # base_grayscale = np.array([get_grayscale(ba) for ba in base]) / 255.0
+        base_l = base_l / 255.0
 
         base_edge = np.array([get_line_drawing(img) for img in base]) / 255.0
         base_edge = np.expand_dims(base_edge, 3)
@@ -163,7 +169,8 @@ class Shader():
             ## all are normalized
             imwriteScaled("results/base_" + str(i) + ".png", base_normalized[i])
             imwriteScaled("results/base_line_" + str(i) + ".jpg", base_edge[i])
-            imwriteScaled("results/base_grayscale_" + str(i) + ".png", base_grayscale[i])
+            # imwriteScaled("results/base_grayscale_" + str(i) + ".png", base_grayscale[i])
+            imwriteScaled("results/base_l_" + str(i) + ".png", base_l[i])
 
         datalen = len(data)
 
@@ -173,40 +180,46 @@ class Shader():
             avg_d_loss = d_loss_tot / (datalen / self.batch_size)
             d_loss_tot = 0.0
             if avg_d_loss > 0.1:
-                print("Training discriminator")
+                print("Training discriminator too")
             for i in xrange(datalen / self.batch_size):
                 batch_files = data[i * self.batch_size : (i+1) * self.batch_size]
                 batch = np.array([get_image(batch_file) for batch_file in batch_files])
 
-                batch_grayscale = np.array([get_grayscale(ba) for ba in batch]) / 255.0
-                batch_grayscale = np.expand_dims(batch_grayscale, 3)
+                # batch_grayscale = np.array([get_grayscale(ba) for ba in batch]) / 255.0
+                # batch_grayscale = np.expand_dims(batch_grayscale, 3)
 
-                batch_edge = np.array([get_line_drawing(img) for img in batch]) / 255.0
+                batch_hcl = [bgr2Hist(ba) for ba in batch]
+                batch_h, batch_c, batch_l = [np.squeeze(j) for j in np.split(np.asarray(batch_hcl), 3, axis=1)]
+                batch_l = np.expand_dims(batch_l / 255.0, 3)
+
+                batch_edge = np.array([get_line_drawing(j) for j in batch]) / 255.0
                 batch_edge = np.expand_dims(batch_edge, 3)
 
-                batch_normalized = batch/255.0
+                # batch_normalized = batch/255.0
 
                 if avg_d_loss > 0.1:
                     d_loss, _ = self.sess.run([self.d_loss, self.d_optim], feed_dict={self.line_images: batch_edge,
-                                                                                      self.real_images: batch_grayscale})
+                                                                                      self.real_images: batch_l})
                 else:
                     d_loss = self.sess.run(self.d_loss, feed_dict={self.line_images: batch_edge,
-                                                                                      self.real_images: batch_grayscale})
+                                                                                      self.real_images: batch_l})
                 d_loss_tot += d_loss
-                g_loss, _ = self.sess.run([self.g_loss, self.g_optim], feed_dict={self.line_images: batch_edge, self.real_images: batch_grayscale})
+                g_loss, _ = self.sess.run([self.g_loss, self.g_optim], feed_dict={self.line_images: batch_edge, self.real_images: batch_l})
 
                 print("%d: [%d / %d] d_loss %f, g_loss %f, avg_d_loss %f" % (e, i, (datalen/self.batch_size), d_loss, g_loss, avg_d_loss))
 
                 if i % 100 == 0:
-                    recreation = self.sess.run(self.gen_shaded_images, feed_dict={self.line_images: batch_edge, self.real_images: batch_grayscale})
+                    recreation = self.sess.run(self.gen_shaded_images, feed_dict={self.line_images: batch_edge, self.real_images: batch_l})
                     for j in xrange(self.batch_size):
-                        imwriteScaled("results/" + str(e * 100000 + i) + "_" + str(j) + ".jpg", recreation[j])
+                        imwriteScaled("results/" + str(e) + "_" + str(i) + "_" + str(j) + ".jpg", recreation[j])
 
 
                 if i % 500 == 0:
                     self.save("./checkpoint", e*100000 + i)
 
+
 if __name__ == '__main__':
+
     if len(sys.argv) < 2:
         print("Usage: python model.py [train, sample]")
     else:

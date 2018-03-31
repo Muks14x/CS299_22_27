@@ -81,6 +81,10 @@ def hsv2bgr(image):
 
 # Bad writing style:
 # functions don't verify input format, so double check changes to code
+
+# Returns h, c, l
+# h & c - ints from [0, 32)
+# l - int from [0, 256)
 def bgr2Hist(image):
     return hcl2Hist(hsv2hcl(bgr2hsv(image)))
 
