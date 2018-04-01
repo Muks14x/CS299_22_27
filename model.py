@@ -23,13 +23,13 @@ class Colorizer():
         self.real_c_idx = tf.placeholder(tf.int32, [self.batch_size, output_size[0], output_size[1], 1])
 
         self.gen_l, self.gen_h, self.gen_c = self.generator(self.line_images)
-        self.gen_h_idx = tf.argmax(tf.sigmoid(self.gen_h), axis=3, output_type=tf.int32)
-        self.gen_c_idx = tf.argmax(tf.sigmoid(self.gen_c), axis=3, output_type=tf.int32)
+        self.gen_h_idx = tf.reshape(tf.argmax(tf.sigmoid(self.gen_h), axis=3, output_type=tf.int32), [self.batch_size, output_size[0], output_size[1], 1])
+        self.gen_c_idx = tf.reshape(tf.argmax(tf.sigmoid(self.gen_c), axis=3, output_type=tf.int32), [self.batch_size, output_size[0], output_size[1], 1])
 
         self.real_images_full = tf.concat(
-            [self.line_images, self.real_l / 256.0, self.real_h_idx / 32.0, self.real_c_idx / 32.0], 3)
+            [self.line_images, tf.div(self.real_l, tf.constant(256.0, dtype=tf.float32)), tf.div(tf.cast(self.real_h_idx, tf.float32), tf.constant(32.0, dtype=tf.float32)), tf.div(tf.cast(self.real_c_idx, tf.float32), tf.constant(32.0, dtype=tf.float32))], 3)
         self.fake_images_full = tf.concat(
-            [self.line_images, self.gen_l / 256.0, self.gen_h_idx / 32.0, self.gen_c_idx / 32.0], 3)
+            [self.line_images, tf.div(self.gen_l, tf.constant(256.0, dtype=tf.float32)), tf.div(tf.cast(self.gen_h_idx, tf.float32), tf.constant(32.0, dtype=tf.float32)), tf.div(tf.cast(self.gen_c_idx, tf.float32), tf.constant(32.0, dtype=tf.float32))], 3)
 
         # We reuse the discriminator when its run the second time because we need the
         # same Variables (and thus the same network) used both times
