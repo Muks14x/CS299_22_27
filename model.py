@@ -19,17 +19,23 @@ class Colorizer():
         self.line_images = tf.placeholder(tf.float32, [self.batch_size] + input_size)
         # self.real_images = tf.placeholder(tf.float32, [self.batch_size] + output_size)
         self.real_l = tf.placeholder(tf.float32, [self.batch_size, output_size[0], output_size[1], 1])
-        self.real_h_idx = tf.placeholder(tf.int32, [self.batch_size, output_size[0], output_size[1], 1])
-        self.real_c_idx = tf.placeholder(tf.int32, [self.batch_size, output_size[0], output_size[1], 1])
+        self.real_h_idx = tf.placeholder(tf.int32, [self.batch_size, output_size[0], output_size[1]])
+        self.real_c_idx = tf.placeholder(tf.int32, [self.batch_size, output_size[0], output_size[1]])
 
         self.gen_l, self.gen_h, self.gen_c = self.generator(self.line_images)
-        self.gen_h_idx = tf.reshape(tf.argmax(tf.sigmoid(self.gen_h), axis=3, output_type=tf.int32), [self.batch_size, output_size[0], output_size[1], 1])
-        self.gen_c_idx = tf.reshape(tf.argmax(tf.sigmoid(self.gen_c), axis=3, output_type=tf.int32), [self.batch_size, output_size[0], output_size[1], 1])
+        self.gen_h_idx = tf.argmax(tf.sigmoid(self.gen_h), axis=3, output_type=tf.int32)
+        self.gen_c_idx = tf.argmax(tf.sigmoid(self.gen_c), axis=3, output_type=tf.int32)
 
         self.real_images_full = tf.concat(
-            [self.line_images, tf.div(self.real_l, tf.constant(256.0, dtype=tf.float32)), tf.div(tf.cast(self.real_h_idx, tf.float32), tf.constant(32.0, dtype=tf.float32)), tf.div(tf.cast(self.real_c_idx, tf.float32), tf.constant(32.0, dtype=tf.float32))], 3)
+            [self.line_images, tf.div(self.real_l, tf.constant(256.0, dtype=tf.float32)),
+             tf.div(tf.cast(tf.expand_dims(self.real_h_idx, axis=3), tf.float32), tf.constant(32.0, dtype=tf.float32)),
+             tf.div(tf.cast(tf.expand_dims(self.real_c_idx, axis=3), tf.float32), tf.constant(32.0, dtype=tf.float32))],
+            3)
         self.fake_images_full = tf.concat(
-            [self.line_images, tf.div(self.gen_l, tf.constant(256.0, dtype=tf.float32)), tf.div(tf.cast(self.gen_h_idx, tf.float32), tf.constant(32.0, dtype=tf.float32)), tf.div(tf.cast(self.gen_c_idx, tf.float32), tf.constant(32.0, dtype=tf.float32))], 3)
+            [self.line_images, tf.div(self.gen_l, tf.constant(256.0, dtype=tf.float32)),
+             tf.div(tf.cast(tf.expand_dims(self.gen_h_idx, axis=3), tf.float32), tf.constant(32.0, dtype=tf.float32)),
+             tf.div(tf.cast(tf.expand_dims(self.gen_c_idx, axis=3), tf.float32), tf.constant(32.0, dtype=tf.float32))],
+            3)
 
         # We reuse the discriminator when its run the second time because we need the
         # same Variables (and thus the same network) used both times
@@ -47,14 +53,14 @@ class Colorizer():
         self.g_adv_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=self.disc_fake_logits,
                                                                                  labels=tf.ones_like(
                                                                                      self.disc_fake_logits)))
-        self.g_loss_l = tf.reduce_mean(tf.nn.l2_loss(self.real_shaded_images - self.gen_l))
+        self.g_loss_l = tf.reduce_mean(tf.nn.l2_loss(self.real_l - self.gen_l))
 
         # Lhue/chroma(x, y) = Dkl(yC|fC(x)) + lambdaH * yC * Dkl(yH|fH(x))
         # Dkl(yC|fC(x)) : chroma_loss, lambdaH : 5, yC : chroma, Dkl(yH|fH(x)) : hue_loss
         chroma_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.real_c_idx, logits=self.gen_c)
         hue_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.real_h_idx, logits=self.gen_h)
         chroma = self.gen_c_idx
-        self.g_loss_hc = tf.reduce_mean(chroma_loss + 5 * chroma * hue_loss)
+        self.g_loss_hc = tf.reduce_mean(chroma_loss + 5 * tf.cast(chroma, tf.float32) * hue_loss)
 
         # Total g_loss is adv_loss + () non_adv_loss
         # non_adv_loss is loss_l + () loss_hc
@@ -239,15 +245,20 @@ class Colorizer():
                                                                    self.real_h_idx: batch_h,
                                                                    self.real_c_idx: batch_c})
                 d_loss_tot += d_loss
-                g_loss, _ = self.sess.run([self.g_loss, self.g_optim],
-                                          feed_dict={self.line_images: batch_edge, self.real_images: batch_l})
+                g_loss, _ = self.sess.run([self.g_loss, self.g_optim], feed_dict={self.line_images: batch_edge,
+                                                                                  self.real_l: batch_l,
+                                                                                  self.real_h_idx: batch_h,
+                                                                                  self.real_c_idx: batch_c})
 
                 print("%d: [%d / %d] d_loss %f, g_loss %f, avg_d_loss %f" % (
-                e, i, (datalen / self.batch_size), d_loss, g_loss, avg_d_loss))
+                    e, i, (datalen / self.batch_size), d_loss, g_loss, avg_d_loss))
 
                 if i % 100 == 0:
-                    recreation = self.sess.run(self.gen_l,
-                                               feed_dict={self.line_images: batch_edge, self.real_images: batch_l})
+                    recreation = np.concatenate(self.sess.run([tf.expand_dims(self.gen_h_idx, axis=3), tf.expand_dims(self.gen_c_idx, axis=3), self.gen_l],
+                                                              feed_dict={self.line_images: batch_edge,
+                                                                         self.real_l: batch_l,
+                                                                         self.real_h_idx: batch_h,
+                                                                         self.real_c_idx: batch_c}))
                     for j in xrange(self.batch_size):
                         imwriteScaled("results/" + str(e) + "_" + str(i) + "_" + str(j) + ".jpg", recreation[j])
 
