@@ -138,7 +138,7 @@ class Colorizer():
                                                     with_w=True)
         # d9 and d10 are (256 x 256 x 32) each
 
-        return tf.nn.tanh(self.d8), self.d9, self.d10
+        return tf.nn.sigmoid(self.d8), self.d9, self.d10
 
     def loadmodel(self, load_discrim=True):
         self.sess = tf.Session()
@@ -253,14 +253,22 @@ class Colorizer():
                 print("%d: [%d / %d] d_loss %f, g_loss %f, avg_d_loss %f" % (
                     e, i, (datalen / self.batch_size), d_loss, g_loss, avg_d_loss))
 
-                if i % 100 == 0:
-                    recreation = np.concatenate(self.sess.run([tf.expand_dims(self.gen_h_idx, axis=3), tf.expand_dims(self.gen_c_idx, axis=3), self.gen_l],
-                                                              feed_dict={self.line_images: batch_edge,
-                                                                         self.real_l: batch_l,
-                                                                         self.real_h_idx: batch_h,
-                                                                         self.real_c_idx: batch_c}))
+                if i % 500 == 0:
+                    # recreation = np.concatenate(self.sess.run([tf.expand_dims(self.gen_h_idx, axis=3), tf.expand_dims(self.gen_c_idx, axis=3), self.gen_l],
+                    #                                           feed_dict={self.line_images: batch_edge,
+                    #                                                      self.real_l: batch_l,
+                    #                                                      self.real_h_idx: batch_h,
+                    #                                                      self.real_c_idx: batch_c}), axis=3)
+                    h_rec, c_rec, l_rec = self.sess.run([tf.expand_dims(self.gen_h_idx, axis=3), tf.expand_dims(self.gen_c_idx, axis=3), self.gen_l],
+                                                                feed_dict={self.line_images: batch_edge,
+                                                                           self.real_l: batch_l,
+                                                                           self.real_h_idx: batch_h,
+                                                                           self.real_c_idx: batch_c})
                     for j in xrange(self.batch_size):
-                        imwriteScaled("results/" + str(e) + "_" + str(i) + "_" + str(j) + ".jpg", recreation[j])
+                        imwriteScaled("results/" + str(e) + "_" + str(i) + "_" + str(j) + "_shaded.jpg", l_rec[j])
+                        imwriteScaled("results/" + str(e) + "_" + str(i) + "_" + str(j) + "_hues.jpg", Hist2bgr(h_rec[j], np.ones(c_rec[j].shape) * 16, l_rec[j]),scale=False)
+                        imwriteScaled("results/" + str(e) + "_" + str(i) + "_" + str(j) + "_chroma.jpg", Hist2bgr(np.ones(h_rec[j].shape) * 16, c_rec[j], l_rec[j]), scale=False)
+                        imwriteScaled("results/" + str(e) + "_" + str(i) + "_" + str(j) + ".jpg", Hist2bgr(h_rec[j], c_rec[j], l_rec[j]), scale=False)
 
                 if i % 500 == 0:
                     self.save("./checkpoint", e * 100000 + i)

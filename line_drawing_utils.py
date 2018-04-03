@@ -24,9 +24,12 @@ def get_image_dirs():
     return glob(os.path.join("imgs", "*.jpg"))
 
 
-def imwriteScaled(name, img):
+def imwriteScaled(name, img, scale=True):
     print("saving img " + name)
-    cv2.imwrite(name, img * 255)
+    if scale:
+        cv2.imwrite(name, img * 255)
+    else:
+        cv2.imwrite(name, img)
 
 
 ## Convert from BGR to HSV/HCL
@@ -69,13 +72,16 @@ def Hist2hcl(h0, c0, l0, numBuckets=32):
 def hcl2hsv(image):
     h0, c0, l0 = [image[:, :, i] for i in range(3)]
     v = (l0 + c0 / 2)
-    s = (c0 / v)
+    # hsv_s = 2 * hsv_c / (2 * grayscale + hsv_c)
+    s = 2 * c0 / (2 * l0 + c0)
+    # s = (c0 / v)
     v *= 256
     s *= 256
     return np.stack([h0, s, v], axis=2).astype(np.uint8)
 
 
 def hsv2bgr(image):
+    image = np.squeeze(image)
     return cv2.cvtColor(image, cv2.COLOR_HSV2BGR)
 
 
@@ -90,7 +96,9 @@ def bgr2Hist(image):
 
 
 def Hist2bgr(h, c, l):
-    return hsv2bgr(hcl2hsv(Hist2hcl(h, c, l)))
+    p = Hist2hcl(h, c, l)
+    q = hcl2hsv(p)
+    return hsv2bgr(q)
 
 
 # class image:
