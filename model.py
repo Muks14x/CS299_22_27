@@ -45,22 +45,35 @@ class Colorizer():
         self.d_loss_real = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=self.disc_real_logits,
                                                                                   labels=tf.constant(
                                                                                       [[0, 1]] * self.batch_size)))
+        tf.summary.scalar("d_loss_real", self.d_loss_real)
+
         self.d_loss_fake = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=self.disc_fake_logits,
                                                                                   labels=tf.constant(
                                                                                       [[1, 0]] * self.batch_size)))
+        tf.summary.scalar("d_loss_fake", self.d_loss_fake)
+
         self.d_loss = self.d_loss_real + self.d_loss_fake
+        tf.summary.scalar("d_loss", self.d_loss)
 
         self.g_adv_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=self.disc_fake_logits,
                                                                                  labels=tf.ones_like(
                                                                                      self.disc_fake_logits)))
+        tf.summary.scalar("g_adv_loss", self.g_adv_loss)
+
         self.g_loss_l = tf.reduce_mean(tf.nn.l2_loss(self.real_l - self.gen_l))
+        tf.summary.scalar("g_loss_l", self.g_loss_l)
 
         # Lhue/chroma(x, y) = Dkl(yC|fC(x)) + lambdaH * yC * Dkl(yH|fH(x))
         # Dkl(yC|fC(x)) : chroma_loss, lambdaH : 5, yC : chroma, Dkl(yH|fH(x)) : hue_loss
         chroma_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.real_c_idx, logits=self.gen_c)
+        # tf.summary.scalar("chroma_loss", chroma_loss)
+
         hue_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.real_h_idx, logits=self.gen_h)
+        # tf.summary.scalar("hue_loss", hue_loss)
+
         chroma = self.gen_c_idx
         self.g_loss_hc = tf.reduce_mean(chroma_loss + 5 * tf.cast(chroma, tf.float32) * hue_loss)
+        tf.summary.scalar("g_loss_hc", self.g_loss_hc)
 
         # Total g_loss is adv_loss + () non_adv_loss
         # non_adv_loss is loss_l + () loss_hc
@@ -212,6 +225,8 @@ class Colorizer():
         datalen = len(data)
 
         d_loss_tot = 0.0
+        train_writer = tf.summary.FileWriter('./logs/1/train', self.sess.graph)
+        counter = 0
 
         for e in xrange(20000):
             avg_d_loss = d_loss_tot / (datalen / self.batch_size)
@@ -219,6 +234,10 @@ class Colorizer():
             if avg_d_loss > 0.1:
                 print("Training discriminator too")
             for i in xrange(datalen / self.batch_size):
+
+                merge = tf.summary.merge_all()
+                counter+=1
+
                 batch_files = data[i * self.batch_size: (i + 1) * self.batch_size]
                 batch = np.array([get_image(batch_file) for batch_file in batch_files])
 
@@ -235,20 +254,23 @@ class Colorizer():
                 # batch_normalized = batch/255.0
 
                 if avg_d_loss > 0.1:
-                    d_loss, _ = self.sess.run([self.d_loss, self.d_optim], feed_dict={self.line_images: batch_edge,
+                    summary_d, d_loss, _ = self.sess.run([merge, self.d_loss, self.d_optim], feed_dict={self.line_images: batch_edge,
                                                                                       self.real_l: batch_l,
                                                                                       self.real_h_idx: batch_h,
                                                                                       self.real_c_idx: batch_c})
                 else:
-                    d_loss = self.sess.run(self.d_loss, feed_dict={self.line_images: batch_edge,
+                    summary_d, d_loss = self.sess.run([merge, self.d_loss], feed_dict={self.line_images: batch_edge,
                                                                    self.real_l: batch_l,
                                                                    self.real_h_idx: batch_h,
                                                                    self.real_c_idx: batch_c})
                 d_loss_tot += d_loss
-                g_loss, _ = self.sess.run([self.g_loss, self.g_optim], feed_dict={self.line_images: batch_edge,
+                summary_g, g_loss, _ = self.sess.run([merge, self.g_loss, self.g_optim], feed_dict={self.line_images: batch_edge,
                                                                                   self.real_l: batch_l,
                                                                                   self.real_h_idx: batch_h,
                                                                                   self.real_c_idx: batch_c})
+
+                summary = summary_g + summary_d
+                train_writer.add_summary(summary, counter)
 
                 print("%d: [%d / %d] d_loss %f, g_loss %f, avg_d_loss %f" % (
                     e, i, (datalen / self.batch_size), d_loss, g_loss, avg_d_loss))
