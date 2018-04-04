@@ -154,7 +154,10 @@ class Colorizer():
         return tf.nn.sigmoid(self.d8), self.d9, self.d10
 
     def loadmodel(self, load_discrim=True):
-        self.sess = tf.Session()
+        config = tf.ConfigProto()
+        config.gpu_options.allow_growth = True
+
+        self.sess = tf.Session(config=config)
         self.sess.run(tf.initialize_all_variables())
 
         if load_discrim:
