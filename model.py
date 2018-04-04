@@ -249,9 +249,9 @@ class Colorizer():
 
                 batch_hcl = [bgr2Hist(ba) for ba in batch]
                 batch_h, batch_c, batch_l = [np.squeeze(j) for j in np.split(np.asarray(batch_hcl), 3, axis=1)]
-                batch_l = np.expand_dims(batch_l / 255.0, 3)
+                batch_l = np.expand_dims(batch_l / 256.0, 3)
 
-                batch_edge = np.array([get_line_drawing(j) for j in batch]) / 255.0
+                batch_edge = np.array([get_line_drawing(j) for j in batch]) / 256.0
                 batch_edge = np.expand_dims(batch_edge, 3)
 
                 # batch_normalized = batch/255.0
@@ -279,11 +279,18 @@ class Colorizer():
                     #                                                      self.real_c_idx: batch_c}), axis=3)
                     h_rec, c_rec, l_rec = self.sess.run([tf.expand_dims(self.gen_h_idx, axis=3), tf.expand_dims(self.gen_c_idx, axis=3), self.gen_l],
                                                                 feed_dict=feed_dict)
+                    h_ori, c_ori, l_ori = self.sess.run(
+                        [tf.expand_dims(self.real_h_idx, axis=3), tf.expand_dims(self.real_c_idx, axis=3), self.real_l],
+                        feed_dict=feed_dict)
                     for j in xrange(self.batch_size):
                         imwriteScaled("results/shaded_" + str(e) + "_" + str(i) + "_" + str(j) + ".jpg", l_rec[j])
                         imwriteScaled("results/hues_" + str(e) + "_" + str(i) + "_" + str(j) + ".jpg", Hist2bgr(h_rec[j], np.ones(c_rec[j].shape) * 16, l_rec[j]),scale=False)
                         imwriteScaled("results/chroma_" + str(e) + "_" + str(i) + "_" + str(j) + ".jpg", Hist2bgr(np.ones(h_rec[j].shape) * 16, c_rec[j], l_rec[j]), scale=False)
-                        imwriteScaled("results/" + str(e) + "_" + str(i) + "_" + str(j) + ".jpg", Hist2bgr(h_rec[j], c_rec[j], l_rec[j]), scale=False)
+                        imwriteScaled("results/" + str(e) + "_" + str(i) + "_" + str(j) + ".jpg", Hist2bgr(h_rec[j], c_rec[j], l_rec[j], upScaleL=True), scale=False)
+                        imwriteScaled("results/ori_" + str(e) + "_" + str(i) + "_" + str(j) + ".jpg",
+                                      Hist2bgr(h_ori[j], c_ori[j], l_ori[j], upScaleL=True), scale=False)
+                        imwriteScaled("results/passed_" + str(e) + "_" + str(i) + "_" + str(j) + ".jpg",
+                                      Hist2bgr(batch_h[j].reshape(h_ori[j].shape), batch_c[j].reshape(c_ori[j].shape), batch_l[j].reshape(h_ori[j].shape), upScaleL=True), scale=False)
 
                 if i % 500 == 0:
                     self.save("./checkpoint", e * 100000 + i)

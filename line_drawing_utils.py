@@ -95,7 +95,9 @@ def bgr2Hist(image):
     return hcl2Hist(hsv2hcl(bgr2hsv(image)))
 
 
-def Hist2bgr(h, c, l):
+def Hist2bgr(h, c, l, upScaleL=False):
+    if upScaleL:
+        l = l * 256.0
     p = Hist2hcl(h, c, l)
     q = hcl2hsv(p)
     return hsv2bgr(q)
