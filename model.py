@@ -205,6 +205,7 @@ class Colorizer():
     def train(self):
         self.loadmodel()
 
+        print("Getting directories...")
         data = get_image_dirs()
         print(data[0])
         base = np.array([get_image(sample_file) for sample_file in data[0: self.batch_size]])

@@ -143,21 +143,3 @@ if __name__ == "__main__":
 
     for i in range(len(data)):
         cv2.imwrite('out_' + data[i], output[i])
-
-data = get_image_dirs()
-out_size = 256
-
-if len(sys.argv) > 1:
-    if sys.argv[1] == "-o":
-        out_size = int(sys.argv[2])
-
-if not os.path.exists("out_imgs"):
-    os.makedirs("out_imgs")
-
-images = np.array([get_image(sample_file, out_size) for sample_file in data])
-line_drawings = np.array([get_line_drawing(img) for img in images])
-line_drawings = np.expand_dims(line_drawings, 3)
-output = np.tile(line_drawings, 3)
-
-for i in range(len(data)):
-    cv2.imwrite('out_' + data[i], output[i])
