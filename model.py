@@ -288,7 +288,9 @@ class Colorizer():
                     #                                                      self.real_l: batch_l,
                     #                                                      self.real_h_idx: batch_h,
                     #                                                      self.real_c_idx: batch_c}), axis=3)
-                    h_rec, c_rec, l_rec = self.sess.run([tf.expand_dims(self.gen_h_idx, axis=3), tf.expand_dims(self.gen_c_idx, axis=3), self.gen_l], feed_dict=feed_dict)
+                    h_rec, c_rec, l_rec = self.sess.run([self.gen_h_idx, self.gen_c_idx, self.gen_l], feed_dict=feed_dict)
+                    h_rec = np.expand_dims(h_rec, axis=3)
+                    c_rec = np.expand_dims(c_rec, axis=3)
 
                     for j in xrange(self.batch_size):
                         imwriteScaled("results/" + str(e) + "_" + str(i) + "_" + str(j) + ".jpg", Hist2bgr(h_rec[j], c_rec[j], l_rec[j], upScaleL=True), scale=False)
