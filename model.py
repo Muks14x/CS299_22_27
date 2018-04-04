@@ -19,22 +19,22 @@ class Colorizer():
         self.line_images = tf.placeholder(tf.float32, [self.batch_size] + input_size)
         # self.real_images = tf.placeholder(tf.float32, [self.batch_size] + output_size)
         self.real_l = tf.placeholder(tf.float32, [self.batch_size, output_size[0], output_size[1], 1])
-        self.real_h_idx = tf.placeholder(tf.int32, [self.batch_size, output_size[0], output_size[1]])
-        self.real_c_idx = tf.placeholder(tf.int32, [self.batch_size, output_size[0], output_size[1]])
+        self.real_h_idx = tf.placeholder(tf.float32, [self.batch_size, output_size[0], output_size[1]])
+        self.real_c_idx = tf.placeholder(tf.float32, [self.batch_size, output_size[0], output_size[1]])
 
         self.gen_l, self.gen_h, self.gen_c = self.generator(self.line_images)
-        self.gen_h_idx = tf.argmax(tf.sigmoid(self.gen_h), axis=3, output_type=tf.int32)
-        self.gen_c_idx = tf.argmax(tf.sigmoid(self.gen_c), axis=3, output_type=tf.int32)
+        self.gen_h_idx = tf.cast(tf.argmax(tf.sigmoid(self.gen_h), axis=3, output_type=tf.int32), dtype=tf.float32)
+        self.gen_c_idx = tf.cast(tf.argmax(tf.sigmoid(self.gen_c), axis=3, output_type=tf.int32), dtype=tf.float32)
 
         self.real_images_full = tf.concat(
             [self.line_images, tf.div(self.real_l, tf.constant(256.0, dtype=tf.float32)),
-             tf.div(tf.cast(tf.expand_dims(self.real_h_idx, axis=3), tf.float32), tf.constant(32.0, dtype=tf.float32)),
-             tf.div(tf.cast(tf.expand_dims(self.real_c_idx, axis=3), tf.float32), tf.constant(32.0, dtype=tf.float32))],
+             tf.div(tf.expand_dims(self.real_h_idx, axis=3), tf.constant(32.0, dtype=tf.float32)),
+             tf.div(tf.expand_dims(self.real_c_idx, axis=3), tf.constant(32.0, dtype=tf.float32))],
             3)
         self.fake_images_full = tf.concat(
             [self.line_images, tf.div(self.gen_l, tf.constant(256.0, dtype=tf.float32)),
-             tf.div(tf.cast(tf.expand_dims(self.gen_h_idx, axis=3), tf.float32), tf.constant(32.0, dtype=tf.float32)),
-             tf.div(tf.cast(tf.expand_dims(self.gen_c_idx, axis=3), tf.float32), tf.constant(32.0, dtype=tf.float32))],
+             tf.div(tf.expand_dims(self.gen_h_idx, axis=3), tf.constant(32.0, dtype=tf.float32)),
+             tf.div(tf.expand_dims(self.gen_c_idx, axis=3), tf.constant(32.0, dtype=tf.float32))],
             3)
 
         # We reuse the discriminator when its run the second time because we need the
@@ -65,14 +65,14 @@ class Colorizer():
 
         # Lhue/chroma(x, y) = Dkl(yC|fC(x)) + lambdaH * yC * Dkl(yH|fH(x))
         # Dkl(yC|fC(x)) : chroma_loss, lambdaH : 5, yC : chroma, Dkl(yH|fH(x)) : hue_loss
-        chroma_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.real_c_idx, logits=self.gen_c)
+        chroma_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=tf.cast(self.real_c_idx, tf.int32), logits=self.gen_c)
         # tf.summary.scalar("chroma_loss", chroma_loss)
 
-        hue_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.real_h_idx, logits=self.gen_h)
+        hue_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=tf.cast(self.real_h_idx, tf.int32), logits=self.gen_h)
         # tf.summary.scalar("hue_loss", hue_loss)
 
-        chroma = self.gen_c_idx
-        self.g_loss_hc = tf.reduce_mean(chroma_loss + 5 * tf.cast(chroma, tf.float32) * hue_loss)
+        chroma = self.real_c_idx
+        self.g_loss_hc = tf.reduce_mean(chroma_loss + 5 * chroma * hue_loss)
         tf.summary.scalar("g_loss_hc", self.g_loss_hc)
 
         # Total g_loss is adv_loss + () non_adv_loss
@@ -253,21 +253,14 @@ class Colorizer():
 
                 # batch_normalized = batch/255.0
 
+                feed_dict = {self.line_images: batch_edge, self.real_l: batch_l, self.real_h_idx : batch_h, self.real_c_idx: batch_c}
+
                 if avg_d_loss > 0.1:
-                    summary_d, d_loss, _ = self.sess.run([merge, self.d_loss, self.d_optim], feed_dict={self.line_images: batch_edge,
-                                                                                      self.real_l: batch_l,
-                                                                                      self.real_h_idx: batch_h,
-                                                                                      self.real_c_idx: batch_c})
+                    summary_d, d_loss, _ = self.sess.run([merge, self.d_loss, self.d_optim], feed_dict=feed_dict)
                 else:
-                    summary_d, d_loss = self.sess.run([merge, self.d_loss], feed_dict={self.line_images: batch_edge,
-                                                                   self.real_l: batch_l,
-                                                                   self.real_h_idx: batch_h,
-                                                                   self.real_c_idx: batch_c})
+                    summary_d, d_loss = self.sess.run([merge, self.d_loss], feed_dict=feed_dict)
                 d_loss_tot += d_loss
-                summary_g, g_loss, _ = self.sess.run([merge, self.g_loss, self.g_optim], feed_dict={self.line_images: batch_edge,
-                                                                                  self.real_l: batch_l,
-                                                                                  self.real_h_idx: batch_h,
-                                                                                  self.real_c_idx: batch_c})
+                summary_g, g_loss, _ = self.sess.run([merge, self.g_loss, self.g_optim], feed_dict=feed_dict)
 
                 summary = summary_g + summary_d
                 train_writer.add_summary(summary, counter)
@@ -282,14 +275,11 @@ class Colorizer():
                     #                                                      self.real_h_idx: batch_h,
                     #                                                      self.real_c_idx: batch_c}), axis=3)
                     h_rec, c_rec, l_rec = self.sess.run([tf.expand_dims(self.gen_h_idx, axis=3), tf.expand_dims(self.gen_c_idx, axis=3), self.gen_l],
-                                                                feed_dict={self.line_images: batch_edge,
-                                                                           self.real_l: batch_l,
-                                                                           self.real_h_idx: batch_h,
-                                                                           self.real_c_idx: batch_c})
+                                                                feed_dict=feed_dict)
                     for j in xrange(self.batch_size):
-                        imwriteScaled("results/" + str(e) + "_" + str(i) + "_" + str(j) + "_shaded.jpg", l_rec[j])
-                        imwriteScaled("results/" + str(e) + "_" + str(i) + "_" + str(j) + "_hues.jpg", Hist2bgr(h_rec[j], np.ones(c_rec[j].shape) * 16, l_rec[j]),scale=False)
-                        imwriteScaled("results/" + str(e) + "_" + str(i) + "_" + str(j) + "_chroma.jpg", Hist2bgr(np.ones(h_rec[j].shape) * 16, c_rec[j], l_rec[j]), scale=False)
+                        imwriteScaled("results/shaded_" + str(e) + "_" + str(i) + "_" + str(j) + ".jpg", l_rec[j])
+                        imwriteScaled("results/hues_" + str(e) + "_" + str(i) + "_" + str(j) + ".jpg", Hist2bgr(h_rec[j], np.ones(c_rec[j].shape) * 16, l_rec[j]),scale=False)
+                        imwriteScaled("results/chroma_" + str(e) + "_" + str(i) + "_" + str(j) + ".jpg", Hist2bgr(np.ones(h_rec[j].shape) * 16, c_rec[j], l_rec[j]), scale=False)
                         imwriteScaled("results/" + str(e) + "_" + str(i) + "_" + str(j) + ".jpg", Hist2bgr(h_rec[j], c_rec[j], l_rec[j]), scale=False)
 
                 if i % 500 == 0:
