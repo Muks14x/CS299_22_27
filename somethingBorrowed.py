@@ -28,16 +28,16 @@ def get_hc_idx(img_h, img_c, param=None):
     spaced = (np.arange(bins) + 0.5) / bins
 
     c_method = 'median'
-    h_method = 'expectation-cf'
+    h_method = 'expectation'
 
     factor = 1.0
 
     # Hue
-    if h_method == 'expectation-cf':  # with chromatic fading
+    if h_method == 'expectation':  # with chromatic fading
         tau = 2 * np.pi
-        a = hist_h * np.exp(1j * tau * spaced)
-        cc = tf.abs(tf.reduce_mean(a, -1))
-        factor = tf.clip_by_value(cc, 0, 0.03) / 0.03
+        a = tf.cast(hist_h, dtype=tf.complex64) * (tf.exp(1j * tau * tf.cast(spaced, dtype=tf.complex64)))
+        # cc = tf.abs(tf.reduce_mean(a, -1))
+        # factor2 = tf.clip_by_value(cc, 0, 0.03) / 0.03
         hsv_h = (angle(tf.reduce_sum(a, -1)) / tau) % 1.0
 
     if c_method == 'median':
