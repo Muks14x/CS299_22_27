@@ -1,6 +1,6 @@
 from line_drawing_utils import *
 from utils import *
-
+from somethingBorrowed import get_hc_idx
 
 class Colorizer():
     def __init__(self, input_size=[256, 256, 1][:], output_size=[256, 256, 3][:], batch_size=4):
@@ -24,8 +24,11 @@ class Colorizer():
         self.real_c_idx = tf.placeholder(tf.float32, [self.batch_size, output_size[0], output_size[1]])
 
         self.gen_l, self.gen_h, self.gen_c = self.generator(self.line_images)
-        self.gen_h_idx = tf.cast(tf.argmax(tf.sigmoid(self.gen_h), axis=3, output_type=tf.int32), dtype=tf.float32)
-        self.gen_c_idx = tf.cast(tf.argmax(tf.sigmoid(self.gen_c), axis=3, output_type=tf.int32), dtype=tf.float32)
+        # self.gen_h_idx = tf.cast(tf.argmax(tf.sigmoid(self.gen_h), axis=3, output_type=tf.int32), dtype=tf.float32)
+        # self.gen_c_idx = tf.cast(tf.argmax(tf.sigmoid(self.gen_c), axis=3, output_type=tf.int32), dtype=tf.float32)
+
+        # self.gen_h_idx = tf.cast(tf.argmax(tf.sigmoid(self.gen_h), axis=3, output_type=tf.int32), dtype=tf.float32)
+        self.gen_h_idx, self.gen_c_idx = get_hc_idx(tf.sigmoid(self.gen_h), tf.sigmoid(self.gen_c))
 
         self.real_images_full = tf.concat(
             [self.line_images, tf.div(self.real_l, tf.constant(256.0, dtype=tf.float32)),
