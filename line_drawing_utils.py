@@ -20,10 +20,10 @@ def get_line_drawing(image):
                                  cv2.THRESH_BINARY, blockSize=9, C=2)
 
 
-def get_image_dirs():
+def get_image_dirs(size):
     li = glob(os.path.join("imgs*", "*.jpg"))
     li.sort()
-    return li
+    return li[:size]
 
 
 def imwriteScaled(name, img, scale=True):

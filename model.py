@@ -3,10 +3,11 @@ from utils import *
 from somethingBorrowed import get_hc_idx
 
 class Colorizer():
-    def __init__(self, input_size=[256, 256, 1][:], output_size=[256, 256, 3][:], batch_size=4):
+    def __init__(self, train_size=1000, input_size=[256, 256, 1][:], output_size=[256, 256, 3][:], batch_size=4):
         self.startEpoch = 0
         self.batch_size = batch_size
         self.output_size = output_size
+        self.train_size = 1000
 
         # non_adv_loss_wt = 0 for pure cGAN
         self.non_adv_loss_wt = 100
@@ -209,7 +210,7 @@ class Colorizer():
         self.loadmodel()
 
         print("Getting directories...")
-        data = get_image_dirs()
+        data = get_image_dirs(self.train_size)
         print(data[0])
         base = np.array([get_image(sample_file) for sample_file in data[0: self.batch_size]])
 
@@ -310,11 +311,14 @@ class Colorizer():
 if __name__ == '__main__':
 
     if len(sys.argv) < 2:
-        print("Usage: python model.py [train, sample]")
+        print("Usage: python model.py train [train_size]")
     else:
         cmd = sys.argv[1]
         if cmd == "train":
-            c = Colorizer()
+            try:
+                c = Colorizer(int(sys.argv[2]))
+            except (IndexError, ValueError):
+                c = Colorizer()
             c.train()
         else:
             print("Usage: python model.py train")
