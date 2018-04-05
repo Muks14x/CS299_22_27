@@ -21,7 +21,9 @@ def get_line_drawing(image):
 
 
 def get_image_dirs():
-    return glob(os.path.join("imgs", "*.jpg"))
+    li = glob(os.path.join("imgs*", "*.jpg"))
+    li.sort()
+    return li
 
 
 def imwriteScaled(name, img, scale=True):
