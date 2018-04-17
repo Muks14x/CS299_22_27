@@ -274,7 +274,7 @@ class Colorizer():
 
                 feed_dict = {self.line_images: batch_edge, self.real_l: batch_l, self.real_h_idx : batch_h, self.real_c_idx: batch_c}
 
-                if avg_d_loss > 0.1:
+                if avg_d_loss > 0.2 and e % 2 == 1:
                     summary_d, d_loss, _ = self.sess.run([merge, self.d_loss, self.d_optim], feed_dict=feed_dict)
                 else:
                     summary_d, d_loss = self.sess.run([merge, self.d_loss], feed_dict=feed_dict)
@@ -307,11 +307,62 @@ class Colorizer():
                 if i % 1000 == 0:
                     self.save("./checkpoint", e * 100000 + i)
 
+    def sample(self):
+        self.loadmodel(False)
+        data = glob(os.path.join("imgs", "*.jpg")) + glob(os.path.join("imgs", "*.png"))
+
+        datalen = len(data)
+
+        for i in range(min(100,datalen / self.batch_size)):
+            batch_files = data[i*self.batch_size:(i+1)*self.batch_size]
+            batch = np.array([get_image(batch_file) for batch_file in batch_files])
+            height, width = batch.shape[1:3]
+            batch = np.asarray([cv2.resize(img, (512, 512)) for img in batch])
+            batch_normalized = batch/255.0
+
+            batch_hcl = [bgr2Hist(ba) for ba in batch]
+            batch_h, batch_c, batch_l = [np.squeeze(j) for j in np.split(np.asarray(batch_hcl), 3, axis=1)]
+            batch_l = np.expand_dims(batch_l / 256.0, 3)
+
+            batch_edge = np.array([get_line_drawing(j) for j in batch]) / 256.0
+            batch_edge = np.expand_dims(batch_edge, 3)
+
+            feed_dict = {self.line_images: batch_edge, self.real_l: batch_l, self.real_h_idx: batch_h,
+                         self.real_c_idx: batch_c}
+            recreation = self.sess.run(self.generated_images, feed_dict=feed_dict)
+
+            h_rec, c_rec, l_rec = self.sess.run([self.gen_h_idx, self.gen_c_idx, self.gen_l], feed_dict=feed_dict)
+            h_rec = np.expand_dims(h_rec, axis=3)
+            c_rec = np.expand_dims(c_rec, axis=3)
+
+            colored_image = Hist2bgr(h_rec[j], c_rec[j], l_rec[j], upScaleL=True)
+            original = batch_normalized
+            line = batch_edge
+            shaded = np.expand_dims(np.mean(colored_image, axis=2), axis=2)
+
+            colored_image = cv2.resize(colored_image, (width, height))
+            original = cv2.resize(original, (width, height))
+            line = cv2.resize(line, (width, height))
+            shaded = cv2.resize(shaded, (width, height))
+            shaded = np.tile(np.expand_dims(shaded, 2), 3)
+
+            imstack = None
+            for img in [original, line, shaded, colored_image]:
+                if imstack is None:
+                    imstack = img.copy()
+                else:
+                    imstack = np.hstack((imstack, img))
+
+            ims("results/sample_"+str(i)+"_output.jpg", colored_image)
+            ims("results/sample_"+str(i)+"_origin.jpg", original)
+            ims("results/sample_"+str(i)+"_line.jpg", line)
+            ims("results/sample_" + str(i) + "_shaded.jpg", shaded)
+            ims("results/stack_" + str(i) + ".jpg", imstack)
 
 if __name__ == '__main__':
 
     if len(sys.argv) < 2:
-        print("Usage: python model.py train [train_size]")
+        print("Usage: python main.py [train, sample]")
     else:
         cmd = sys.argv[1]
         if cmd == "train":
@@ -320,5 +371,8 @@ if __name__ == '__main__':
             except (IndexError, ValueError):
                 c = Colorizer()
             c.train()
+        elif cmd == "sample":
+            c = Colorizer(input_size=[512, 512, 1][:], output_size=[512, 512, 3][:])
+            c.sample()
         else:
-            print("Usage: python model.py train")
+            print("Usage: python main.py train")
